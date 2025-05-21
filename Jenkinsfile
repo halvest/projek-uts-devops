@@ -3,6 +3,7 @@ pipeline {
 
   environment {
     NODE_ENV = 'development'
+    KUBECONFIG_CREDENTIALS_ID = 'kubeconfig-secret' // ID secret di Jenkins
   }
 
   stages {
@@ -26,20 +27,29 @@ pipeline {
       }
     }
 
-    stage('Run App (Optional)') {
-      when {
-        expression { env.RUN_APP == 'true' }
-      }
+    stage('Build Docker Image') {
       steps {
-        echo 'Starting the application...'
-        sh 'npm start &'
+        sh 'docker build -t projek-uts-devops .'
+      }
+    }
+
+    stage('Deploy to Kubernetes (Staging)') {
+      steps {
+        withCredentials([file(credentialsId: "${KUBECONFIG_CREDENTIALS_ID}", variable: 'KUBECONFIG')]) {
+          sh '''
+            mkdir -p ~/.kube
+            cp $KUBECONFIG ~/.kube/config
+            kubectl apply -f deployment.yaml
+            kubectl apply -f service.yaml
+          '''
+        }
       }
     }
   }
 
   post {
     success {
-      echo '🎉 Build and Test Succeeded!'
+      echo '✅ Build, Test, and Deploy Succeeded!'
     }
     failure {
       echo '❌ Build or Test Failed.'
